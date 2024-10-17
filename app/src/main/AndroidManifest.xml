@@ -38,7 +38,8 @@
 
             <meta-data
                 android:name="androidx.wear.tiles.PREVIEW"
-                android:resource="@drawable/tile_preview" />
+                android:resource="@drawable/tile_preview"
+                android:value="true" />
         </service>
 
         <uses-library

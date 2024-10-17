@@ -4,6 +4,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import android.os.Bundle
+import android.text.style.TtsSpan.TextBuilder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -27,6 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.rotary.RotaryScrollEvent
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.modifier.modifierLocalMapOf
 import androidx.compose.ui.semantics.Role.Companion.Button
 import androidx.compose.ui.text.font.FontWeight
@@ -35,6 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import androidx.wear.tiles.LayoutElementBuilders
+import androidx.wear.tiles.RequestBuilders
+import androidx.wear.tiles.TileBuilders
+import androidx.wear.tiles.TileService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -52,23 +59,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun WearApp() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colors.background),
-        contentAlignment = Alignment.Center
-    ) {
-        Greeting()
-    }
-}
-
-@Composable
-fun Greeting() {
 
     val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
     val day = dateFormat.format(Date())
 
     val calendar = Calendar.getInstance()
+    val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
     calendar.time = Date()
     calendar.add(Calendar.DAY_OF_YEAR, 1)
     val nextDay = dateFormat.format(calendar.time)
@@ -82,7 +78,12 @@ fun Greeting() {
     var tmrL by remember { mutableStateOf("") }
     var tmrD by remember { mutableStateOf("") }
 
-    var mode by remember { mutableIntStateOf(1) }
+    var mode by remember { mutableIntStateOf(when (currentHour) {
+        1, 2, 3, 4, 5, 6, 7, 8 -> 1
+        9, 10, 11, 12, 13 -> 2
+        14, 15, 16, 17 -> 3
+        else -> 4
+    }) }
 
     fun modeToTitle(mode: Int): String {
         if (mode == 1) return "오늘의 아침"
@@ -115,52 +116,68 @@ fun Greeting() {
         tmrD = tmr[2]
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colors.background)
+            .onRotaryScrollEvent { event ->
+                val delta = event.verticalScrollPixels
+                if (delta > 0) {
+                    if (mode < 3) mode += 3
+                } else {
+                    if (mode > 3) mode -= 3
+                }
+                true
+            },
+        contentAlignment = Alignment.Center
     ) {
-        if (mode != 1) {Text(modifier = Modifier.clickable { mode -= 1 }, text = " ←", color = Color.Gray, textAlign = TextAlign.Center, fontSize = 30.sp)}
-        else {Text(text = " ←", color = Color.Gray, textAlign = TextAlign.Center, fontSize = 30.sp)}
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Column (
-            modifier = Modifier,
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                modifier = Modifier,
-                textAlign = TextAlign.Center,
-                color = Color.White,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                text = modeToTitle(mode)
-            )
+            if (mode != 1) {Text(modifier = Modifier.clickable { mode -= 1 }, text = " ←", color = Color.Gray, textAlign = TextAlign.Center, fontSize = 30.sp)}
+            else {Text(text = " ←", color = Color.Gray, textAlign = TextAlign.Center, fontSize = 30.sp)}
 
-            Text(
-                modifier = Modifier,
-                textAlign = TextAlign.Center,
-                color = Color(0xFFFF79F1C),
-                fontSize = 10.sp,
-                text = if (mode <= 3) {day.substring(0, 4) + "." + day.substring(4, 6) + "." + day.substring(6, 8)} else {nextDay.substring(0, 4) + "." + nextDay.substring(4, 6) + "." + nextDay.substring(6, 8)}
-            )
+            Spacer(modifier = Modifier.weight(1f))
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
+            Column (
                 modifier = Modifier,
-                textAlign = TextAlign.Center,
-                color = Color.White,
-                fontSize = 12.sp,
-                text = modeToContent(mode)
-            )
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    modifier = Modifier,
+                    textAlign = TextAlign.Center,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    text = modeToTitle(mode)
+                )
+
+                Text(
+                    modifier = Modifier,
+                    textAlign = TextAlign.Center,
+                    color = Color(0xFFFF79F1C),
+                    fontSize = 10.sp,
+                    text = if (mode <= 3) {day.substring(0, 4) + "." + day.substring(4, 6) + "." + day.substring(6, 8)} else {nextDay.substring(0, 4) + "." + nextDay.substring(4, 6) + "." + nextDay.substring(6, 8)}
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    modifier = Modifier,
+                    textAlign = TextAlign.Center,
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    text = modeToContent(mode)
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            if (mode != 6) {Text(modifier = Modifier.clickable { mode += 1 }, text = "→ ", color = Color.Gray, textAlign = TextAlign.Center, fontSize = 30.sp)}
+            else {Text(text = "→ ", color = Color.Gray, textAlign = TextAlign.Center, fontSize = 30.sp)}
         }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        if (mode != 6) {Text(modifier = Modifier.clickable { mode += 1 }, text = "→ ", color = Color.Gray, textAlign = TextAlign.Center, fontSize = 30.sp)}
-        else {Text(text = "→ ", color = Color.Gray, textAlign = TextAlign.Center, fontSize = 30.sp)}
     }
 }
 
